@@ -1,0 +1,44 @@
+<nav class="navbar navbar-expand-lg premium-navbar">
+  <div class="container-fluid px-0 align-items-center">
+    <a class="navbar-brand premium-brand" href="/listings">
+      <img src="/assets/logo.png" alt="CampusSphere logo" class="navbar-logo">
+      <span>CampusSphere</span>
+    </a>
+
+    <button class="navbar-toggler premium-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <form class="navbar-search-form" action="/listings" method="GET">
+        <div class="navbar-searchbox">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" name="search" placeholder="Search..." aria-label="Search listings" />
+        </div>
+      </form>
+
+      <a class="premium-button premium-create" href="/listings/create">Create Club</a>
+
+      <ul class="navbar-nav mx-auto premium-navlist">
+        <li class="nav-item"><a class="nav-link" href="/listings">Explore Clubs</a></li>
+        <li class="nav-item"><a class="nav-link" href="/listings?category=events">Events</a></li>
+        <li class="nav-item"><a class="nav-link" href="/listings?category=competitions">Competitions</a></li>
+        <li class="nav-item"><a class="nav-link" href="/listings?category=workshops">Workshops</a></li>
+        <li class="nav-item"><a class="nav-link" href="/listings?category=achievements">Achievements</a></li>
+        <li class="nav-item"><a class="nav-link" href="/listings?category=gallery">Gallery</a></li>
+      </ul>
+
+      <div class="premium-actions">
+        <% if (currentUser) { %>
+          
+          <form action="/logout" method="get" style="display: inline;">
+            <button type="submit" class="premium-button premium-logout">Logout</button>
+          </form>
+        <% } else { %>
+          <a class="premium-button premium-login" href="/login">Login</a>
+          <a class="premium-button premium-signup" href="/signup">Sign Up</a>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</nav>

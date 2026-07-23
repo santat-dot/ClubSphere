@@ -1,0 +1,42 @@
+<%- layout("/layouts/boilerplate") -%>
+ <form method="post" action="/signup" novalidate class="needs-validation">
+      
+      <div class="row">
+      <div class="col-8 offset-2">
+      <h3>SignUp On CodeSphere </h3>
+      <br>
+      <div class="form-container" >
+      
+      <div>
+      <lable for="username" class="form-lable">username</lable>
+      <input name="username"  class="form-control" type="text" id="username" required/>
+      <div class="valid-feedback">Looks good!</div>
+      </div>
+      <br /><br />
+      <div>
+       <lable for="email" class="form-lable">Email</lable> 
+      <input
+        name="email"
+        id="email"
+        class="form-control"
+        required
+      ></input>
+      </div>
+      <br /><br />
+      <div>
+       <lable for="password" class="form-lable">Password</lable> 
+      <input
+        name="password"
+        type="password"
+        id="password"
+        class="form-control"
+        required
+      />
+      </div>
+      <br /><br />
+      
+      <button class="add-club">SignUp</button>
+      </div>
+      </div>
+      </div>
+    </form>

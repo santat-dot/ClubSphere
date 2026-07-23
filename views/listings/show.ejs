@@ -1,0 +1,155 @@
+<% layout("/layouts/boilerplate") -%>
+
+<body>
+    <div class="row justify-content-center mt-5">
+        <div class="col-lg-8 col-md-10">
+            <h3 class="mb-4">Listing Details</h3>
+
+            <div class="card show-card overflow-hidden">
+                <% if (listingData.image) { %>
+                    <img src="<%= listingData.image.url %>" alt="<%= listingData.title %>" class="card-img-top show-img" />
+                <% } %>
+
+                <div class="card-body">
+                    <h4 class="card-title mb-2"><%= listingData.title %></h4>
+                    <p class="card-text text-muted mb-4"><%= listingData.description %></p>
+
+                    <ul class="list-unstyled show-details mb-4">
+                        <li class="mb-2">
+                            <strong>Price:</strong>
+                            <span>₹ <%= listingData.price.toLocaleString("en-IN") %></span>
+                        </li>
+                        <li class="mb-2">
+                            <strong>Location:</strong>
+                            <span><%= listingData.location %></span>
+                        </li>
+                        <li>
+                            <strong>Country:</strong>
+                            <span><%= listingData.country %></span>
+                        </li>
+                    </ul>
+
+                    <div class="show-actions">
+                        <a href="/listings/<%= listingData._id %>/edit" class="btn add-club btn-lg" >Edit</a>
+                        <form action="/listings/<%= listingData._id %>?_method=delete" method="post" class="m-0">
+                            <button type="submit" class="btn btn-dark btn-lg">Delete</button>
+                        </form>
+
+                    </div>
+
+                    <hr>
+                    <div class="reviews mt-3">
+                        <h3>Send Reviews</h3>
+                        <form action="/listings/<%=listingData._id%>/reviews" method="post" novalidate class="needs-validation" >
+                            <!-- <div class="form-group mt-3">
+                            <label for="rating" class="form-lable">Rating</label>
+                            <input type="range" min="1" max="5" name="review[rating]" class="form-control"  required>
+                           
+                            </div> -->
+                            
+
+                                <br>
+                                <!-- star rating (not a separate form) -->
+                                <fieldset class="starability-coinFlip">
+
+                                <input type="radio" id="no-rate" class="input-no-rate" name="review[rating]" value="1" checked aria-label="No rating." />
+
+                                <input type="radio" id="rate1" name="review[rating]" value="1" />
+                                <label for="rate1">1 star.</label>
+
+                                <input type="radio" id="rate2" name="review[rating]" value="2" />
+                                <label for="rate2">2 stars.</label>
+
+                                <input type="radio" id="rate3" name="review[rating]" value="3" />
+                                <label for="rate3">3 stars.</label>
+
+                                <input type="radio" id="rate4" name="review[rating]" value="4" />
+                                <label for="rate4">4 stars.</label>
+
+                                <input type="radio" id="rate5" name="review[rating]" value="5" />
+                                <label for="rate5">5 stars.</label>
+
+                                <span class="starability-focus-ring"></span>
+                                </fieldset>
+                       
+                        <div>
+                        <lable for="review" name="comment" class="form-lable mt-3">Comments</lable>
+                        <textarea name="review[comment]" class="form-control" rows="5" required></textarea> 
+                         <div class="invalid-feedback">Please drop the review</div>
+                        </div>
+
+                        
+                            <button class="mt-3">Submit</button>
+                        </form>
+                    <br>
+
+                    </div>
+                    </div>
+                    
+                   
+                </div>
+
+
+
+                        <h3 class="mt-3 mb-3 ms-5">All Reviews</h3>
+                        <div class="row">
+                        <% if (listingData && Array.isArray(listingData.reviews) && listingData.reviews.length) { %>
+                            <% for (let rev of listingData.reviews) { %>
+                                <div class="col-md-6 mb-3">
+                                    <div class="card-body mt-3 cards">
+                                        <h5 class="card-title">@<%= rev.username %></h5>
+                                        <p class="card-text"><%= rev.comment %></p>
+                                        <p class="starability-result" data-rating=<%= rev.rating %>>
+                                         <%= rev.rating %> Stars
+                                         </p>
+                                        <form method="post" action="/listings/<%= listingData._id %>/reviews/<%= rev._id %>?_method=DELETE">
+                                            <button class="mt-3 mb-3 sm dark">Delete</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            <% } %>
+                        <% } else { %>
+                            <p class="col-12 text-center">No reviews yet.</p>
+                        <% } %>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Map Section -->
+                 <div class="row">
+                    <div class="col-6 offset-2">
+                <div class="mt-5">
+                    <h3 class="mb-3">Location Map</h3>
+                    <div id="map" style="height: 400px;"></div>
+                </div>
+                </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.26.0/mapbox-gl.js"></script>
+    <script>
+        let mapToken = "<%=process.env.mapToken%>"
+        let coordinate=<%- JSON.stringify(listingData.geometry.coordinates)%>
+        console.log("Map Token:", mapToken);
+        
+       
+            const map = new mapboxgl.Map({
+                accessToken: mapToken,
+                container: 'map',
+                center: coordinate,
+                zoom: 12
+            });
+
+            //map marker
+            new mapboxgl.Marker()
+            .setLngLat(coordinate)
+            .addTo(map);
+        
+    </script>
+                     
+                    
+
+                    <!-- <p><%=listingData.reviews%></p> -->
