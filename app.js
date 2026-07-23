@@ -36,7 +36,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 
 
-// let MONGO_URL = "mongodb://127.0.0.1:27017/wanderlust";
+
 
 async function main() {
     await mongoose.connect(dburl);
@@ -54,12 +54,12 @@ main().then((res) =>{
 const store = MongoStore.create({
     mongoUrl:dburl,
     crypto:{
-        secret:"mysecrete"
+        secret:process.env.Secret,
     },
     touchAfter:24*3600,
 })
 
-// Session and passport setup MUST come before route registration
+
 let sessionOptions = {
     store,
     secret: "mysecrete",
@@ -86,7 +86,7 @@ passport.use(new LocalStrategy(User.authenticate()))
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
 
-// Middleware to pass currentUser to all templates
+
 app.use((req, res, next) => {
     res.locals.currentUser = req.user;
     next();
