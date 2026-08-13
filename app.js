@@ -118,9 +118,13 @@ main().then((url) => {
         res.status(statusCode).render("error.ejs", { message });
     });
 
+    if (process.env.NODE_ENV !== "production") {
     app.listen(port, () => {
-        console.log(`App is Listening On ${port}`);
+        console.log(`Server started on port ${port}`);
     });
+}
+
+module.exports = app;
 });
 
 
