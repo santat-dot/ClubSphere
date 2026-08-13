@@ -80,7 +80,10 @@ async function connectDb() {
         return null;
     }
     cachedConnection = mongoose
-        .connect(dburl)
+        .connect(dburl, {
+            serverSelectionTimeoutMS: 10000,
+            connectTimeoutMS: 10000,
+        })
         .then((conn) => {
             console.log(`Database connected: ${dburl.startsWith("mongodb://127.0.0.1") ? "local" : "Atlas"}`);
             return conn;
@@ -93,38 +96,65 @@ async function connectDb() {
 }
 
 // ===============================
-// SESSION + PASSPORT (synchronously register so Vercel can import app)
+// SESSION + PASSPORT (lazy initialize session store for serverless)
 // ===============================
 if (process.env.NODE_ENV === "production") {
     app.set("trust proxy", 1);
 }
 
-const sessionStore = dburl
-    ? MongoStore.create({
-          mongoUrl: dburl,
-          crypto: { secret: process.env.Secret },
-          touchAfter: 24 * 3600,
-      })
-    : null;
+let sessionMiddleware = null;
+let sessionInitPromise = null;
 
-const sessionOptions = {
-    store: sessionStore || undefined,
-    secret: process.env.Secret || "devsecret",
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-    },
-};
+async function initSession() {
+    if (sessionMiddleware) return;
 
-if (sessionStore) {
-    sessionStore.on("error", (err) => console.error("Mongo Store Error:", err));
+    const baseOptions = {
+        secret: process.env.Secret || "devsecret",
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        },
+    };
+
+    if (!dburl) {
+        // No DB URL: use in-memory session (development without DB)
+        sessionMiddleware = session(baseOptions);
+        return;
+    }
+
+    // Create a clientPromise from the cached mongoose connection.
+    const clientPromise = connectDb().then(() => {
+        // mongoose.connection.getClient() is available after connect
+        return mongoose.connection.getClient();
+    });
+
+    const store = MongoStore.create({
+        clientPromise,
+        crypto: { secret: process.env.Secret },
+        touchAfter: 24 * 3600,
+    });
+
+    store.on("error", (err) => console.error("Mongo Store Error:", err));
+
+    sessionMiddleware = session({ ...baseOptions, store });
 }
 
-app.use(session(sessionOptions));
+// Wrapper middleware that ensures session middleware is initialized lazily
+app.use((req, res, next) => {
+    if (sessionMiddleware) return sessionMiddleware(req, res, next);
+    if (!sessionInitPromise) sessionInitPromise = initSession();
+    sessionInitPromise
+        .then(() => sessionMiddleware(req, res, next))
+        .catch((err) => {
+            console.error("Session initialization error:", err && err.message ? err.message : err);
+            next(err);
+        });
+});
 
+// Passport setup (after session wrapper)
 app.use(passport.initialize());
 app.use(passport.session());
 passport.use(new LocalStrategy(User.authenticate()));
@@ -143,6 +173,21 @@ app.use("/", userRouter);
 
 // Root redirect
 app.get("/", (req, res) => res.redirect("/listings"));
+
+// Health endpoint
+app.get("/health", async (req, res) => {
+    try {
+        const connState = mongoose.connection.readyState; // 1 = connected
+        if (connState === 1) {
+            return res.json({ status: "ok", mongodb: "connected" });
+        } else {
+            return res.status(503).json({ status: "error", mongodb: "disconnected" });
+        }
+    } catch (e) {
+        console.error("Health check error:", e && e.message ? e.message : e);
+        return res.status(500).json({ status: "error", mongodb: "unknown" });
+    }
+});
 
 // 404
 app.use((req, res, next) => next(new ExpressError(404, "Page Not Found!")));
@@ -165,7 +210,4 @@ if (process.env.NODE_ENV !== "production") {
         }
         app.listen(port, () => console.log(`Server started on port ${port}`));
     });
-} else {
-    // attempt connection in production but do not crash the lambda on failure
-    connectDb();
 }
