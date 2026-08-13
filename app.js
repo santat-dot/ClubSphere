@@ -7,10 +7,10 @@ const mongoose = require("mongoose");
 
 const fallbackDbUrl = "mongodb://127.0.0.1:27017/wanderlust";
 
-const dburl =
-    process.env.AtlasUrl ||
-    process.env.MONGODB_URI ||
-    fallbackDbUrl;
+// Prefer AtlasUrl or MONGODB_URI for production. Only fall back to local DB when
+// running in non-production (local development).
+const configuredDbUrl = process.env.AtlasUrl || process.env.MONGODB_URI;
+const dburl = configuredDbUrl || (process.env.NODE_ENV !== "production" ? fallbackDbUrl : null);
 
 const methodOverride = require("method-override");
 const path = require("path");
@@ -132,7 +132,7 @@ passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
 
 app.use((req, res, next) => {
-    res.locals.currentUser = req.user;
+    res.locals.currentUser = req.user || null;
     next();
 });
 

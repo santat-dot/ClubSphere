@@ -34,15 +34,13 @@ let listingSchema = mongoose.Schema({
         }
     ],
 
-    geometry:{
-        type:{
-            type:String,
-            enum:['Point'],
-            required:true,
+    geometry: {
+        type: {
+            type: String,
+            enum: ['Point']
         },
-        coordinates:{
-            type:[Number],
-            required:true
+        coordinates: {
+            type: [Number]
         }
     }
 

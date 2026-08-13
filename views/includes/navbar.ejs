@@ -29,8 +29,7 @@
       </ul>
 
       <div class="premium-actions">
-        <% if (currentUser) { %>
-          
+        <% if (typeof currentUser !== "undefined" && currentUser) { %>
           <form action="/logout" method="get" style="display: inline;">
             <button type="submit" class="premium-button premium-logout">Logout</button>
           </form>

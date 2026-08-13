@@ -11,7 +11,7 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'cloudSphere',
-    allowedFormats:  ["png","jpeg","jpg","WebP", "SVG", "AVIF","APNG"], 
+        allowed_formats: ["png","jpeg","jpg","webp", "svg", "avif", "apng"], 
     
     },
 });
