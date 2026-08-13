@@ -79,11 +79,13 @@ async function connectDb() {
         console.warn("No MongoDB URL configured (AtlasUrl or MONGODB_URI). Skipping DB connect.");
         return null;
     }
-    cachedConnection = mongoose
-        .connect(dburl, {
-            serverSelectionTimeoutMS: 10000,
-            connectTimeoutMS: 10000,
-        })
+    cachedConnection = mongoose.connect(dburl, {
+    serverSelectionTimeoutMS: 15000,
+    connectTimeoutMS: 15000,
+    tls: true,
+    retryWrites: true,
+    retryReads: true,
+})
         .then((conn) => {
             console.log(`Database connected: ${dburl.startsWith("mongodb://127.0.0.1") ? "local" : "Atlas"}`);
             return conn;
