@@ -51,8 +51,9 @@ module.exports.showListingsPost=async (req,res)=>{
         query: req.body.listing.location,
         limit: 1
     }).send()
-
-    console.log(response.body.features[0].geometry);
+    if (!response || !response.body || !response.body.features || response.body.features.length === 0) {
+        throw new ExpressError(400, "Location not found; please provide a more specific location.");
+    }
     
     let newInfo =new list(req.body.listing);
     if(req.file){
@@ -62,7 +63,7 @@ module.exports.showListingsPost=async (req,res)=>{
         };
     }
 
-    newInfo.geometry= response.body.features[0].geometry;
+    newInfo.geometry = response.body.features[0].geometry;
 
     let info =await newInfo.save();
     console.log(info);
@@ -86,7 +87,11 @@ module.exports.editListing = async (req, res) => {
             query: req.body.listing.location,
             limit: 1
         }).send();
-        
+
+        if (!response || !response.body || !response.body.features || response.body.features.length === 0) {
+            throw new ExpressError(400, "Location not found for updated address; please provide a more specific location.");
+        }
+
         req.body.listing.geometry = response.body.features[0].geometry;
         console.log("Updated geometry for location:", req.body.listing.location);
     }

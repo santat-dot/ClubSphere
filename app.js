@@ -69,268 +69,103 @@ app.use(
 // DATABASE CONNECTION
 // ===============================
 
-async function connectDb(url) {
-    try {
-        await mongoose.connect(url);
-
-        console.log(
-            `Database connected: ${
-                url.startsWith("mongodb://127.0.0.1")
-                    ? "local"
-                    : "Atlas"
-            }`
-        );
-
-        return true;
-
-    } catch (err) {
-
-        console.log(
-            `Database connection failed for ${url}:`,
-            err.message
-        );
-
-        return false;
+// -------------------------------
+// Cached DB connection for serverless environments
+// -------------------------------
+let cachedConnection = null;
+async function connectDb() {
+    if (cachedConnection) return cachedConnection;
+    if (!dburl) {
+        console.warn("No MongoDB URL configured (AtlasUrl or MONGODB_URI). Skipping DB connect.");
+        return null;
     }
+    cachedConnection = mongoose
+        .connect(dburl)
+        .then((conn) => {
+            console.log(`Database connected: ${dburl.startsWith("mongodb://127.0.0.1") ? "local" : "Atlas"}`);
+            return conn;
+        })
+        .catch((err) => {
+            console.error(`Database connection failed for ${dburl}:`, err.message || err);
+            return null;
+        });
+    return cachedConnection;
 }
 
-
-let effectiveDbUrl = dburl;
-
-
-async function main() {
-
-    const connectedToAtlas = await connectDb(dburl);
-
-    if (!connectedToAtlas && dburl !== fallbackDbUrl) {
-
-        console.log("Falling back to local database...");
-
-        effectiveDbUrl = fallbackDbUrl;
-
-        const connectedLocal =
-            await connectDb(fallbackDbUrl);
-
-        if (!connectedLocal) {
-
-            console.error(
-                "Both Atlas and local database connection failed."
-            );
-
-            process.exit(1);
-        }
-    }
-
-    return effectiveDbUrl;
+// ===============================
+// SESSION + PASSPORT (synchronously register so Vercel can import app)
+// ===============================
+if (process.env.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
 }
 
-
-// ===============================
-// DATABASE + SESSION + PASSPORT
-// ===============================
-
-main().then((url) => {
-
-    // ===============================
-    // MONGO SESSION STORE
-    // ===============================
-
-    const store = MongoStore.create({
-
-        mongoUrl: url,
-
-        crypto: {
-            secret:
-                process.env.Secret ||
-                "mysecrete",
-        },
-
-        touchAfter: 24 * 3600,
-    });
-
-
-    // ===============================
-    // SESSION OPTIONS
-    // ===============================
-
-    const sessionOptions = {
-
-        store,
-
-        secret:
-            process.env.Secret ||
-            "mysecrete",
-
-        resave: false,
-
-        saveUninitialized: true,
-
-        cookie: {
-
-            expires:
-                Date.now() +
-                7 * 24 * 60 * 60 * 1000,
-
-            maxAge:
-                7 * 24 * 60 * 60 * 1000,
-
-            httpOnly: true,
-        },
-    };
-
-
-    // ===============================
-    // SESSION STORE ERROR
-    // ===============================
-
-    store.on("error", (err) => {
-
-        console.log(
-            "Error in Mongo Session Store",
-            err
-        );
-
-    });
-
-
-    // ===============================
-    // SESSION
-    // ===============================
-
-    app.use(
-        session(sessionOptions)
-    );
-
-
-    // ===============================
-    // PASSPORT
-    // ===============================
-
-    app.use(
-        passport.initialize()
-    );
-
-    app.use(
-        passport.session()
-    );
-
-
-    passport.use(
-        new LocalStrategy(
-            User.authenticate()
-        )
-    );
-
-
-    passport.serializeUser(
-        User.serializeUser()
-    );
-
-    passport.deserializeUser(
-        User.deserializeUser()
-    );
-
-
-    // ===============================
-    // CURRENT USER
-    // ===============================
-
-    app.use((req, res, next) => {
-
-        res.locals.currentUser =
-            req.user;
-
-        next();
-    });
-
-
-    // ===============================
-    // ROUTES
-    // ===============================
-
-    app.use(
-        "/listings",
-        listingRouter
-    );
-
-    app.use(
-        "/listings/:id/reviews",
-        reviewRouter
-    );
-
-    app.use(
-        "/",
-        userRouter
-    );
-
-
-    // ===============================
-    // 404 ERROR
-    // ===============================
-
-    app.use((req, res, next) => {
-
-        next(
-            new ExpressError(
-                404,
-                "Page Not Found!"
-            )
-        );
-
-    });
-
-
-    // ===============================
-    // ERROR HANDLER
-    // ===============================
-
-    app.use(
-        (err, req, res, next) => {
-
-            let {
-                statusCode = 500,
-                message =
-                    "Internal Server Error",
-            } = err;
-
-            res
-                .status(statusCode)
-                .render(
-                    "error.ejs",
-                    { message }
-                );
-
-        }
-    );
-
-
-    // ===============================
-    // LOCAL DEVELOPMENT SERVER
-    // ===============================
-
-    if (
-        process.env.NODE_ENV !==
-        "production"
-    ) {
-
-        app.listen(
-            port,
-            () => {
-
-                console.log(
-                    `Server started on port ${port}`
-                );
-
-            }
-        );
-
-    }
-
+const sessionStore = dburl
+    ? MongoStore.create({
+          mongoUrl: dburl,
+          crypto: { secret: process.env.Secret },
+          touchAfter: 24 * 3600,
+      })
+    : null;
+
+const sessionOptions = {
+    store: sessionStore || undefined,
+    secret: process.env.Secret || "devsecret",
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+    },
+};
+
+if (sessionStore) {
+    sessionStore.on("error", (err) => console.error("Mongo Store Error:", err));
+}
+
+app.use(session(sessionOptions));
+
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new LocalStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+app.use((req, res, next) => {
+    res.locals.currentUser = req.user;
+    next();
 });
 
+// Routes
+app.use("/listings", listingRouter);
+app.use("/listings/:id/reviews", reviewRouter);
+app.use("/", userRouter);
 
-// ===============================
-// VERCEL EXPORT
-// ===============================
+// Root redirect
+app.get("/", (req, res) => res.redirect("/listings"));
 
+// 404
+app.use((req, res, next) => next(new ExpressError(404, "Page Not Found!")));
+
+// Error handler
+app.use((err, req, res, next) => {
+    let { statusCode = 500, message = "Internal Server Error" } = err;
+    res.status(statusCode).render("error.ejs", { message });
+});
+
+// Export app synchronously for Vercel
 module.exports = app;
+
+// Start local server and connect DB in development only
+if (process.env.NODE_ENV !== "production") {
+    connectDb().then((conn) => {
+        if (!conn) {
+            console.error("Failed to connect to DB in development. Exiting.");
+            process.exit(1);
+        }
+        app.listen(port, () => console.log(`Server started on port ${port}`));
+    });
+} else {
+    // attempt connection in production but do not crash the lambda on failure
+    connectDb();
+}
