@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const { MongoClient } = require("mongodb");
 
 const MONGODB_URI =
     process.env.AtlasUrl || process.env.MONGODB_URI;
@@ -8,41 +7,34 @@ if (!MONGODB_URI) {
     throw new Error("MongoDB connection string is missing");
 }
 
-
-// ==========================================
-// MONGOOSE CONNECTION
-// ==========================================
-
-let mongoosePromise = null;
+let cachedConnection = null;
 
 async function connectMongoose() {
-
+    // Already connected
     if (mongoose.connection.readyState === 1) {
         return mongoose.connection;
     }
 
-    if (!mongoosePromise) {
+    // Connection currently being established
+    if (cachedConnection) {
+        return cachedConnection;
+    }
 
-        mongoosePromise = mongoose.connect(MONGODB_URI, {
-            serverSelectionTimeoutMS: 15000,
-            connectTimeoutMS: 15000,
+    cachedConnection = mongoose
+        .connect(MONGODB_URI, {
+            serverSelectionTimeoutMS: 10000,
+            connectTimeoutMS: 10000,
             socketTimeoutMS: 45000,
 
             retryWrites: true,
-            retryReads: true,
-
-            tls: true
+            retryReads: true
         })
         .then(() => {
-
             console.log("MongoDB / Mongoose connected");
-
             return mongoose.connection;
-
         })
         .catch((error) => {
-
-            mongoosePromise = null;
+            cachedConnection = null;
 
             console.error(
                 "MongoDB connection failed:",
@@ -51,62 +43,10 @@ async function connectMongoose() {
 
             throw error;
         });
-    }
 
-    return mongoosePromise;
+    return cachedConnection;
 }
-
-
-// ==========================================
-// NATIVE MONGODB CLIENT
-// ==========================================
-
-let mongoClientPromise = null;
-
-function getMongoClient() {
-
-    if (!mongoClientPromise) {
-
-        const client = new MongoClient(MONGODB_URI, {
-
-            serverSelectionTimeoutMS: 15000,
-            connectTimeoutMS: 15000,
-            socketTimeoutMS: 45000,
-
-            retryWrites: true,
-            retryReads: true,
-
-            tls: true
-        });
-
-        mongoClientPromise = client.connect()
-            .then(() => {
-
-                console.log(
-                    "MongoDB native client connected"
-                );
-
-                return client;
-
-            })
-            .catch((error) => {
-
-                mongoClientPromise = null;
-
-                console.error(
-                    "Native MongoDB connection failed:",
-                    error.message
-                );
-
-                throw error;
-            });
-    }
-
-    return mongoClientPromise;
-}
-
 
 module.exports = {
-    connectMongoose,
-    getMongoClient
+    connectMongoose
 };

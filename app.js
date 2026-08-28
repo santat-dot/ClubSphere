@@ -4,6 +4,7 @@ if (process.env.NODE_ENV !== "production") {
 
 const express = require("express");
 const path = require("path");
+const mongoose = require("mongoose");
 
 const session = require("express-session");
 const MongoStore = require("connect-mongo").default;
@@ -14,12 +15,7 @@ const LocalStrategy = require("passport-local");
 const methodOverride = require("method-override");
 const ejsMate = require("ejs-mate");
 
-const mongoose = require("mongoose");
-
-const {
-    connectMongoose,
-    getMongoClient
-} = require("./db.js");
+const { connectMongoose } = require("./db.js");
 
 const ExpressError =
     require("./utility/ExpressError.js");
@@ -43,7 +39,7 @@ const port = process.env.PORT || 8080;
 
 
 // ==========================================
-// EXPRESS
+// VIEW ENGINE
 // ==========================================
 
 app.set("view engine", "ejs");
@@ -54,6 +50,11 @@ app.set(
 );
 
 app.engine("ejs", ejsMate);
+
+
+// ==========================================
+// MIDDLEWARE
+// ==========================================
 
 app.use(
     express.urlencoded({
@@ -78,7 +79,7 @@ app.use(
 
 
 // ==========================================
-// TRUST PROXY
+// VERCEL PROXY
 // ==========================================
 
 if (process.env.NODE_ENV === "production") {
@@ -87,21 +88,63 @@ if (process.env.NODE_ENV === "production") {
 
 
 // ==========================================
+// DATABASE CONNECTION
+// ==========================================
+
+async function ensureDatabaseConnection(
+    req,
+    res,
+    next
+) {
+    try {
+
+        await connectMongoose();
+
+        next();
+
+    } catch (error) {
+
+        console.error(
+            "Database connection error:",
+            error
+        );
+
+        next(error);
+    }
+}
+
+
+// ==========================================
 // SESSION
 // ==========================================
 
-const mongoClientPromise =
-    getMongoClient();
+const mongoUrl =
+    process.env.AtlasUrl ||
+    process.env.MONGODB_URI;
+
+if (!mongoUrl) {
+    throw new Error(
+        "AtlasUrl or MONGODB_URI is missing"
+    );
+}
 
 const sessionStore =
     MongoStore.create({
 
-        clientPromise:
-            mongoClientPromise,
+        mongoUrl: mongoUrl,
 
         collectionName: "sessions",
 
-        touchAfter: 24 * 3600
+        ttl:
+            7 *
+            24 *
+            60 *
+            60,
+
+        touchAfter:
+            24 *
+            60 *
+            60
     });
 
 
@@ -138,6 +181,12 @@ app.use(
             secure:
                 process.env.NODE_ENV ===
                 "production",
+
+            sameSite:
+                process.env.NODE_ENV ===
+                "production"
+                    ? "none"
+                    : "lax",
 
             maxAge:
                 7 *
@@ -193,28 +242,11 @@ app.use(
 
 
 // ==========================================
-// DATABASE BEFORE ROUTES
+// DATABASE
 // ==========================================
 
 app.use(
-    async (req, res, next) => {
-
-        try {
-
-            await connectMongoose();
-
-            next();
-
-        } catch (error) {
-
-            console.error(
-                "Database middleware error:",
-                error
-            );
-
-            next(error);
-        }
-    }
+    ensureDatabaseConnection
 );
 
 
@@ -255,29 +287,59 @@ app.get(
 
 
 // ==========================================
-// HEALTH
+// HEALTH CHECK
 // ==========================================
-app.get("/health", async (req, res) => {
-    try {
-        await connectMongoose();
 
-        res.status(200).json({
-            status: "ok",
-            mongodb: mongoose.connection.readyState === 1
-                ? "connected"
-                : "disconnected"
-        });
+app.get(
+    "/health",
+    async (req, res) => {
 
-    } catch (error) {
-        console.error("HEALTH ERROR:", error);
+        try {
 
-        res.status(500).json({
-            status: "error",
-            mongodb: "failed",
-            message: error.message
-        });
+            await connectMongoose();
+
+            const connected =
+                mongoose.connection
+                    .readyState === 1;
+
+            if (!connected) {
+
+                return res
+                    .status(503)
+                    .json({
+                        status: "error",
+                        mongodb:
+                            "disconnected"
+                    });
+            }
+
+            return res
+                .status(200)
+                .json({
+                    status: "ok",
+                    mongodb:
+                        "connected"
+                });
+
+        } catch (error) {
+
+            console.error(
+                "HEALTH ERROR:",
+                error
+            );
+
+            return res
+                .status(500)
+                .json({
+                    status: "error",
+                    mongodb:
+                        "failed",
+                    message:
+                        error.message
+                });
+        }
     }
-});
+);
 
 
 // ==========================================
@@ -328,14 +390,14 @@ app.use(
 
 
 // ==========================================
-// EXPORT
+// EXPORT FOR VERCEL
 // ==========================================
 
 module.exports = app;
 
 
 // ==========================================
-// LOCAL SERVER
+// LOCAL DEVELOPMENT SERVER
 // ==========================================
 
 if (
@@ -344,6 +406,7 @@ if (
 ) {
 
     connectMongoose()
+
         .then(() => {
 
             app.listen(
@@ -358,12 +421,13 @@ if (
             );
 
         })
+
         .catch(
             (error) => {
 
                 console.error(
                     "Failed to start:",
-                    error.message
+                    error
                 );
 
                 process.exit(1);
