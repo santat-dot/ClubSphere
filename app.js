@@ -79,7 +79,7 @@ app.use(
 
 
 // ==========================================
-// VERCEL PROXY
+// TRUST PROXY (needed on Render too, for secure cookies)
 // ==========================================
 
 if (process.env.NODE_ENV === "production") {
@@ -390,47 +390,39 @@ app.use(
 
 
 // ==========================================
-// EXPORT FOR VERCEL
+// EXPORT (used if you ever deploy to Vercel too)
 // ==========================================
 
 module.exports = app;
 
 
 // ==========================================
-// LOCAL DEVELOPMENT SERVER
+// START SERVER — always runs now, on Render and locally
 // ==========================================
 
-if (
-    process.env.NODE_ENV !==
-    "production"
-) {
+connectMongoose()
+    .then(() => {
 
-    connectMongoose()
+        app.listen(
+            port,
+            () => {
 
-        .then(() => {
-
-            app.listen(
-                port,
-                () => {
-
-                    console.log(
-                        `Server started on port ${port}`
-                    );
-
-                }
-            );
-
-        })
-
-        .catch(
-            (error) => {
-
-                console.error(
-                    "Failed to start:",
-                    error
+                console.log(
+                    `Server started on port ${port}`
                 );
 
-                process.exit(1);
             }
         );
-}
+
+    })
+    .catch(
+        (error) => {
+
+            console.error(
+                "Failed to start:",
+                error
+            );
+
+            process.exit(1);
+        }
+    );
